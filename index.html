@@ -35,10 +35,9 @@
     .leaflet-control-measure { order:2 }
     .leaflet-control-myscale { order:3 }
     .leaflet-control-cal img {
-      width:16px; height:16; filter:invert(1); vertical-align:middle;
+      width:16px; height:16px; filter:invert(1); vertical-align:middle;
     }
-    .leaflet-control-myscale svg { overflow:visible; }
-    .leaflet-control-myscale { line-height:1; }
+    .leaflet-control-myscale svg { overflow:visible; display:block; }
 
     /* Crosshair cursor */
     .leaflet-container.crosshair { cursor: crosshair!important; }
@@ -229,7 +228,7 @@
     function setupHoldListener() {
       map.on("mousedown", e=>{
         if (mode) return;
-        holdTimer = setTimeout(()=> pinPrompt(e.latlng), 750);
+        holdTimer = setTimeout(()=> pinPrompt(e.latlng), 700);
       });
       map.on("mouseup mousemove", ()=> clearTimeout(holdTimer));
     }
@@ -327,7 +326,7 @@
         onChildAdded(pinsRef,   s=>renderPin(s.key,s.val()));
         onChildChanged(pinsRef, s=>updatePin(s.key,s.val()));
 
-        // calibrate
+        // calibrate control
         calCtl=L.control({position:"bottomleft"});
         calCtl.onAdd=()=>{
           const el=L.DomUtil.create("div","leaflet-control-cal");
@@ -343,7 +342,7 @@
         };
         calCtl.addTo(map);
 
-        // measure
+        // measure control
         measureCtl=L.control({position:"bottomleft"});
         measureCtl.onAdd=()=>{
           const btn=L.DomUtil.create("div","leaflet-control-measure");
@@ -359,13 +358,13 @@
         measureCtl.addTo(map);
       }
 
-      // swap image
+      // swap image and fit
       const bounds=[[0,0],[d.h,d.w]];
       if(imgLayer) map.removeLayer(imgLayer);
       imgLayer=L.imageOverlay(d.mapUrl,bounds).addTo(map);
       map.fitBounds(bounds);
 
-      // initial scale + zoom text
+      // initial draw
       buildScale();
       updateZoom();
     });
@@ -376,15 +375,20 @@
       scaleCtl=L.control({position:"bottomleft"});
       scaleCtl.onAdd=()=>{
         const div=L.DomUtil.create("div","leaflet-control-myscale");
-        const zoomFac=Math.pow(2,map.getZoom()), step=100, max=500;
-        const pxUnit=config.pxPerUnit*zoomFac;
+        // fixed width = 20% of map width
+        const meterWidth = Math.round(map.getSize().x * 0.2);
+        const zoomFac = Math.pow(2,map.getZoom());
+        const pxUnit = config.pxPerUnit * zoomFac;
+        const max = 500, step = 100;
         let lines="", labels="";
-        for(let m=0;m<=max;m+=step){
-          const x=Math.round(m*pxUnit);
-          lines+=`<line x1="${x}" y1="0" x2="${x}" y2="4" stroke="#fff" stroke-width="2"/>`;
-          labels+=`<text x="${x}" y="12" font-size="10" fill="#fff" text-anchor="middle">${m}</text>`;
+        for(let m=0; m<=max; m+=step){
+          const x = Math.round(m * pxUnit);
+          if(x <= meterWidth){
+            lines += `<line x1="${x}" y1="0" x2="${x}" y2="4" stroke="#fff" stroke-width="2"/>`;
+            labels+= `<text x="${x}" y="12" font-size="10" fill="#fff" text-anchor="middle">${m}</text>`;
+          }
         }
-        div.innerHTML=`<svg width="${max*pxUnit+20}" height="16">${lines}${labels}</svg>`;
+        div.innerHTML = `<svg width="${meterWidth}" height="16">${lines}${labels}</svg>`;
         return div;
       };
       scaleCtl.addTo(map);
