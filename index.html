@@ -6,7 +6,16 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <style>
-    html, body, #map { height:100%; margin:0 }
+    html, body, #map {
+      height:100%;
+      margin:0;
+      /* prevent text-selection & touch highlights */
+      touch-action: none;
+      -webkit-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+    }
 
     /* Top bar */
     #bar {
@@ -192,7 +201,7 @@
       if (mode==="measure") {
         measurePts.push(e.latlng);
         if (measurePts.length===2) {
-          const [a,b]=measurePts;
+          const [a,b] = measurePts;
           const px = map.latLngToLayerPoint(a)
                       .distanceTo(map.latLngToLayerPoint(b));
           const dist = (px/(config.pxPerUnit*Math.pow(2,map.getZoom())))
@@ -208,7 +217,7 @@
       else if (mode==="cal") {
         calPts.push(e.latlng);
         if (calPts.length===2) {
-          const [u,v]=calPts;
+          const [u,v] = calPts;
           const px = map.latLngToLayerPoint(u)
                       .distanceTo(map.latLngToLayerPoint(v));
           ask(`Pixels: ${Math.round(px)} → real distance (e.g. 120 mi):`, val=>{
@@ -228,7 +237,7 @@
     function setupHoldListener() {
       map.on("mousedown", e=>{
         if (mode) return;
-        holdTimer = setTimeout(()=> pinPrompt(e.latlng), 700);
+        holdTimer = setTimeout(()=> pinPrompt(e.latlng), 750);
       });
       map.on("mouseup mousemove", ()=> clearTimeout(holdTimer));
     }
@@ -358,7 +367,7 @@
         measureCtl.addTo(map);
       }
 
-      // swap image and fit
+      // swap overlay + fit
       const bounds=[[0,0],[d.h,d.w]];
       if(imgLayer) map.removeLayer(imgLayer);
       imgLayer=L.imageOverlay(d.mapUrl,bounds).addTo(map);
@@ -375,17 +384,19 @@
       scaleCtl=L.control({position:"bottomleft"});
       scaleCtl.onAdd=()=>{
         const div=L.DomUtil.create("div","leaflet-control-myscale");
-        // fixed width = 20% of map width
         const meterWidth = Math.round(map.getSize().x * 0.2);
         const zoomFac = Math.pow(2,map.getZoom());
         const pxUnit = config.pxPerUnit * zoomFac;
-        const max = 500, step = 100;
+        const max = 500;
         let lines="", labels="";
-        for(let m=0; m<=max; m+=step){
+        for(let m=0; m<=max; m+=50){
           const x = Math.round(m * pxUnit);
           if(x <= meterWidth){
-            lines += `<line x1="${x}" y1="0" x2="${x}" y2="4" stroke="#fff" stroke-width="2"/>`;
-            labels+= `<text x="${x}" y="12" font-size="10" fill="#fff" text-anchor="middle">${m}</text>`;
+            const tickLen = (m % 100 === 0 ? 4 : 2);
+            lines += `<line x1="${x}" y1="0" x2="${x}" y2="${tickLen}" stroke="#fff" stroke-width="1"/>`;
+            if(m % 100 === 0){
+              labels += `<text x="${x}" y="12" font-size="10" fill="#fff" text-anchor="middle">${m}</text>`;
+            }
           }
         }
         div.innerHTML = `<svg width="${meterWidth}" height="16">${lines}${labels}</svg>`;
