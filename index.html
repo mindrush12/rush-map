@@ -80,7 +80,7 @@
     initializeApp({
       apiKey: "AIzaSyAvOYFqN4QaygGY-vzECYZJKUBZBCjddvg",
       databaseURL: "https://rush-fantasy-maps-default-rtdb.firebaseio.com",
-      storageBucket: "rush-fantasy-maps.appspot.com"
+      storageBucket: "https://rush-fantasy-maps-default-rtdb.firebaseio.com"
     });
     const db = getDatabase(), st = getStorage();
     const cfgRef = ref(db, "config"), pinsRef = ref(db, "pins");
