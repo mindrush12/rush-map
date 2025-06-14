@@ -14,6 +14,7 @@
       user-select: none;
       -webkit-touch-callout: none;
     }
+
     /* Top bar */
     #bar {
       position:absolute; top:10px; left:50%; transform:translateX(-50%);
@@ -24,6 +25,7 @@
       border:0; border-radius:4px; padding:4px 10px;
       background:#555; color:#fff; cursor:pointer;
     }
+
     /* Bottom-left controls */
     .leaflet-bottom.leaflet-left {
       display:flex !important; gap:6px;
@@ -32,23 +34,25 @@
     .leaflet-control-cal,
     .leaflet-control-measure,
     .leaflet-control-myscale {
-      background:#333; color:#fff; font:12px sans-serif;
-      border-radius:6px; padding:2px 6px; text-align:center;
+      background:#333; color:#fff; font:14px sans-serif;
+      border-radius:6px; padding:6px 12px; text-align:center;
       cursor:pointer; margin:0;
     }
     .leaflet-control-cal     { order:1 }
     .leaflet-control-measure { order:2 }
     .leaflet-control-myscale { order:3 }
     .leaflet-control-cal img {
-      width:16px; height:16px; filter:invert(1); vertical-align:middle;
+      width:20px; height:20px; filter:invert(1); vertical-align:middle;
     }
     .leaflet-control-myscale svg {
       overflow:visible; display:block;
     }
+
     /* Crosshair cursor */
     .leaflet-container.crosshair {
       cursor: crosshair!important;
     }
+
     /* Popup/messages */
     .msg {
       position:fixed; inset:0; display:flex;
@@ -70,6 +74,7 @@
       border:0; border-radius:4px;
       background:#08f; color:#fff; cursor:pointer;
     }
+
     /* Pin prompt */
     .pinAsk {
       position:absolute; background:#222; color:#fff;
@@ -87,15 +92,17 @@
       display:flex; gap:4px; margin:6px 0; justify-content:center;
     }
     .pinAsk .color-picker button {
-      width:18px; height:18px; border:2px solid #fff;
+      width:20px; height:20px; border:2px solid #fff;
       border-radius:4px; cursor:pointer; padding:0;
     }
+
     /* Measure tooltip */
     .measureTip {
       background:#222; color:#fff;
       font:12px sans-serif; padding:4px 6px;
       border-radius:4px; pointer-events:none;
     }
+
     /* Signature */
     #sig {
       position:absolute; bottom:10px; right:10px;
@@ -155,8 +162,8 @@
       const pt = map.latLngToContainerPoint(latlng),
             div = document.createElement("div");
       div.className = "pinAsk";
-      div.style.left = `${pt.x-110}px`;
-      div.style.top  = `${pt.y-10}px`;
+      div.style.left = `${pt.x - 110}px`;
+      div.style.top  = `${pt.y - 10}px`;
       div.innerHTML = `
         Label:<input id="t"><br>
         URL:<input id="u"><br>
@@ -172,6 +179,13 @@
         <button id="a">OK</button>`;
       document.body.appendChild(div);
 
+      // ensure it's fully on-screen
+      const { width, height, left, top } = div.getBoundingClientRect();
+      const clampX = Math.min(Math.max(left, 10), window.innerWidth - width - 10);
+      const clampY = Math.min(Math.max(top, 10), window.innerHeight - height - 10);
+      div.style.left = `${clampX}px`;
+      div.style.top  = `${clampY}px`;
+
       div.querySelectorAll(".color-picker button").forEach(b => {
         b.onclick = () => {
           currentColour = b.dataset.c;
@@ -183,28 +197,34 @@
       div.querySelector("#a").onclick = () => {
         const lbl = div.querySelector("#t").value.trim(),
               url = div.querySelector("#u").value.trim();
-        if (lbl) push(pinsRef, { x: latlng.lat, y: latlng.lng, label:lbl, color:currentColour, url });
-        div.remove(); mode = "";
+        if (lbl) push(pinsRef, {
+          x: latlng.lat, y: latlng.lng,
+          label: lbl, color: currentColour, url
+        });
+        div.remove();
+        mode = "";
       };
     }
 
     function onMapClick(e) {
-      if (mode==="measure") {
+      if (mode === "measure") {
         measurePts.push(e.latlng);
-        if (measurePts.length===2) {
+        if (measurePts.length === 2) {
           const [a,b] = measurePts;
           const px = map.latLngToLayerPoint(a)
                       .distanceTo(map.latLngToLayerPoint(b));
-          const dist = (px/(config.pxPerUnit*Math.pow(2,map.getZoom())))
-                       .toFixed(1)+" "+config.unit;
-          L.popup({closeButton:false}).setLatLng(b).setContent(dist).openOn(map);
+          const dist = (px / (config.pxPerUnit * Math.pow(2,map.getZoom())))
+                       .toFixed(1) + " " + config.unit;
+          L.popup({closeButton:false})
+           .setLatLng(b)
+           .setContent(dist)
+           .openOn(map);
           map.getContainer().classList.remove("crosshair");
           mode=""; measurePts=[];
         }
-      }
-      else if (mode==="cal") {
+      } else if (mode === "cal") {
         calPts.push(e.latlng);
-        if (calPts.length===2) {
+        if (calPts.length === 2) {
           const [u,v] = calPts;
           const px = map.latLngToLayerPoint(u)
                       .distanceTo(map.latLngToLayerPoint(v));
@@ -212,7 +232,7 @@
             const m = val.match(/^([\d.]+)\s*(mi|km)$/i);
             if (m) set(cfgRef, {
               ...config,
-              pxPerUnit: px/(parseFloat(m[1])*Math.pow(2,map.getZoom())),
+              pxPerUnit: px / (parseFloat(m[1]) * Math.pow(2,map.getZoom())),
               unit: m[2].toLowerCase()
             });
           });
@@ -223,32 +243,28 @@
     }
 
     function setupHoldListener() {
-      // raw container touch/mouse events
       const container = map.getContainer();
-
       function touchToLatLng(e) {
         const t = e.changedTouches ? e.changedTouches[0] : e;
         const rect = container.getBoundingClientRect();
         const pt = L.point(t.clientX - rect.left, t.clientY - rect.top);
         return map.containerPointToLatLng(pt);
       }
-
       function startHold(e) {
+        if (e.touches && e.touches.length > 1) return;  // ignore pinch
         e.preventDefault();
         holdTimer = setTimeout(() => {
-          const latlng = touchToLatLng(e);
-          pinPrompt(latlng);
-        }, 750);
+          pinPrompt(touchToLatLng(e));
+        }, 1500);
       }
       function cancelHold() {
         clearTimeout(holdTimer);
       }
-
-      container.addEventListener("touchstart", startHold, {passive:false});
+      container.addEventListener("touchstart", startHold, { passive:false });
       container.addEventListener("touchend",   cancelHold);
       container.addEventListener("touchmove",  cancelHold);
       container.addEventListener("touchcancel",cancelHold);
-      container.addEventListener("mousedown",  e => startHold(e));
+      container.addEventListener("mousedown",  startHold);
       container.addEventListener("mouseup",    cancelHold);
       container.addEventListener("mousemove",  cancelHold);
     }
@@ -262,35 +278,36 @@
           <button class="delBtn" style="background:#c00;color:#fff;border:0;border-radius:4px;padding:2px 6px">✕</button>
         </div>`;
       const m = L.marker([p.x,p.y],{icon:icons[p.color]}).addTo(map).bindPopup(html);
-      markers[id]=m;
-      m.on("popupopen", ()=>{
+      markers[id] = m;
+      m.on("popupopen", () => {
         const c = m.getPopup().getElement();
-        c.querySelector(".delBtn").onclick = ()=>{
-          remove(ref(db,"pins/"+id)); map.removeLayer(m);
+        c.querySelector(".delBtn").onclick = () => {
+          remove(ref(db,"pins/"+id));
+          map.removeLayer(m);
         };
-        c.querySelector(".editBtn").onclick = ()=>{
+        c.querySelector(".editBtn").onclick = () => {
           box.innerHTML = `
             <div><b>Edit Pin</b></div>
             Label:<input id="editLabel" value="${p.label}"><br>
             URL:<input id="editUrl"   value="${p.url||""}"><br>
             <button id="saveBtn">Save</button>`;
           msg.classList.add("show");
-          document.getElementById("saveBtn").onclick = ()=>{
+          document.getElementById("saveBtn").onclick = () => {
             const lbl=document.getElementById("editLabel").value.trim(),
                   url=document.getElementById("editUrl").value.trim();
-            set(ref(db,"pins/"+id),{x:p.x,y:p.y,label:lbl,color:p.color,url});
+            set(ref(db,"pins/"+id),{ x:p.x, y:p.y, label:lbl, color:p.color, url });
             msg.classList.remove("show");
           };
         };
       });
     }
-    function updatePin(id,p){
-      if(markers[id]) map.removeLayer(markers[id]);
+    function updatePin(id,p) {
+      if (markers[id]) map.removeLayer(markers[id]);
       renderPin(id,p);
     }
 
     function updateZoom(){
-      zoomDisplay.innerText = `Zoom: ${(100*Math.pow(2,map.getZoom())).toFixed(0)}%`;
+      zoomDisplay.innerText = `Zoom: ${(100 * Math.pow(2,map.getZoom())).toFixed(0)}%`;
     }
 
     const firebaseConfig = {
@@ -304,16 +321,16 @@
           cfgRef  = ref(db,"config"),
           pinsRef = ref(db,"pins");
 
-    document.getElementById("up").onclick = ()=> picker.click();
+    document.getElementById("up").onclick = () => picker.click();
     const picker = document.getElementById("picker");
     picker.onchange = async e => {
-      const file = e.target.files[0]; if(!file) return;
+      const file = e.target.files[0]; if (!file) return;
       const img = new Image();
-      img.onload = async ()=>{
+      img.onload = async () => {
         const path = `maps/${Date.now()}_${file.name}`;
         await uploadBytes(sRef(st,path),file);
         const url = await getDownloadURL(sRef(st,path));
-        set(cfgRef,{mapUrl:url,w:img.naturalWidth,h:img.naturalHeight,pxPerUnit:20,unit:"mi"});
+        set(cfgRef,{ mapUrl:url, w:img.naturalWidth, h:img.naturalHeight, pxPerUnit:20, unit:"mi" });
       };
       img.src = URL.createObjectURL(file);
     };
@@ -326,50 +343,42 @@
       purple:"https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-violet.png",
       orange:"https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-orange.png"
     };
-    for(let c in iconURLs){
-      icons[c] = L.icon({ iconUrl:iconURLs[c], iconSize:[25,41], iconAnchor:[12,41] });
+    for (let c in iconURLs) {
+      icons[c] = L.icon({ iconUrl:iconURLs[c], iconSize:[30,50], iconAnchor:[15,50] });
     }
 
     onValue(cfgRef, snap => {
       const d = snap.val();
-      if(!d){ pop("Upload a map first."); return; }
+      if (!d) { pop("Upload a map first."); return; }
       config = d;
 
-      if(!map){
+      if (!map) {
         map = L.map("map",{ crs:L.CRS.Simple, minZoom:-5, maxZoom:6 })
           .on("click", onMapClick)
-          .on("zoomend", ()=>{
-            buildScale();
-            updateZoom();
-          });
+          .on("zoomend", ()=>{ buildScale(); updateZoom(); });
         setupHoldListener();
         onChildAdded(pinsRef,   s=>renderPin(s.key,s.val()));
         onChildChanged(pinsRef, s=>updatePin(s.key,s.val()));
 
-        // calibrate
+        // calibrate control
         calCtl = L.control({position:"bottomleft"});
-        calCtl.onAdd = ()=>{
+        calCtl.onAdd = ()=> {
           const el = L.DomUtil.create("div","leaflet-control-cal");
-          el.title="Calibrate"; el.innerHTML='<img src="https://img.icons8.com/ios-filled/50/compass.png"/>';
+          el.title="Calibrate";
+          el.innerHTML = '<img src="https://img.icons8.com/ios-filled/50/compass.png"/>';
           L.DomEvent.disableClickPropagation(el);
-          el.onclick = ()=>{
-            mode="cal"; calPts=[]; map.getContainer().classList.add("crosshair");
-            pop("Click two points to calibrate");
-          };
+          el.onclick = ()=>{ mode="cal"; calPts=[]; map.getContainer().classList.add("crosshair"); pop("Click two points to calibrate"); };
           return el;
         };
         calCtl.addTo(map);
 
-        // measure
+        // measure control
         measureCtl = L.control({position:"bottomleft"});
-        measureCtl.onAdd = ()=>{
+        measureCtl.onAdd = ()=> {
           const btn = L.DomUtil.create("div","leaflet-control-measure");
           btn.innerText="Measure";
           L.DomEvent.disableClickPropagation(btn);
-          btn.onclick = ()=>{
-            mode="measure"; measurePts=[]; map.getContainer().classList.add("crosshair");
-            pop("Click two points to measure");
-          };
+          btn.onclick = ()=>{ mode="measure"; measurePts=[]; map.getContainer().classList.add("crosshair"); pop("Click two points to measure"); };
           return btn;
         };
         measureCtl.addTo(map);
@@ -377,7 +386,7 @@
 
       // swap overlay + fit
       const bounds = [[0,0],[d.h,d.w]];
-      if(imgLayer) map.removeLayer(imgLayer);
+      if (imgLayer) map.removeLayer(imgLayer);
       imgLayer = L.imageOverlay(d.mapUrl,bounds).addTo(map);
       map.fitBounds(bounds);
 
@@ -386,27 +395,27 @@
     });
 
     function buildScale(){
-      if(!config) return;
-      if(scaleCtl) map.removeControl(scaleCtl);
+      if (!config) return;
+      if (scaleCtl) map.removeControl(scaleCtl);
       scaleCtl = L.control({position:"bottomleft"});
-      scaleCtl.onAdd = () => {
+      scaleCtl.onAdd = ()=> {
         const div = L.DomUtil.create("div","leaflet-control-myscale");
         const meterW = Math.round(map.getSize().x * 0.2);
-        const zoomF = Math.pow(2,map.getZoom());
-        const pxU = config.pxPerUnit * zoomF;
-        const max=500;
+        const zoomF  = Math.pow(2,map.getZoom());
+        const pxU    = config.pxPerUnit * zoomF;
+        const max    = 500;
         let lines="", labels="";
-        for(let m=0; m<=max; m+=50){
+        for (let m=0; m<=max; m+=50) {
           const x = Math.round(m * pxU);
-          if(x<=meterW){
+          if (x <= meterW) {
             const len = (m%100===0?4:2);
-            lines += `<line x1="${x}" y1="0" x2="${x}" y2="${len}" stroke="#fff" stroke-width="1"/>`;
-            if(m%100===0){
-              labels += `<text x="${x}" y="12" font-size="10" fill="#fff" text-anchor="middle">${m}</text>`;
+            lines  += `<line x1="${x}" y1="0" x2="${x}" y2="${len}" stroke="#fff" stroke-width="1"/>`;
+            if (m%100===0) {
+              labels += `<text x="${x}" y="14" font-size="12" fill="#fff" text-anchor="middle">${m}</text>`;
             }
           }
         }
-        div.innerHTML = `<svg width="${meterW}" height="16">${lines}${labels}</svg>`;
+        div.innerHTML = `<svg width="${meterW}" height="18">${lines}${labels}</svg>`;
         return div;
       };
       scaleCtl.addTo(map);
