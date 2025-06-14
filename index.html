@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Interactive Fantasy Map</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <style>
+    html,body,#map{height:100%;margin:0}
+    #bar{position:absolute;top:10px;left:50%;transform:translateX(-50%);
+         background:#333;border-radius:8px;padding:6px 10px;display:flex;gap:6px;
+         z-index:2000;font-family:sans-serif}
+    #bar button.action{border:0;border-radius:4px;padding:4px 10px;font-size:13px;
+         color:#fff;background:#333;cursor:pointer}
+    .cBtn{width:22px;height:22px;padding:0;border:2px solid #fff;border-radius:4px;cursor:pointer}
+    .red{background:#d33}.blue{background:#36c}.green{background:#3a3}
+    .yellow{background:#fc3}.purple{background:#93f}.orange{background:#e84}
+
+    /* bottom-left Measure button */
+    #msrBL{
+      position:absolute; bottom:80px; left:10px; z-index:2002;
+      background:#333; color:#fff; border:none; border-radius:6px;
+      padding:6px 10px; font:13px sans-serif; cursor:pointer;
+    }
+
+    /* crosshair only when measuring is active */
+    .leaflet-container.crosshair { cursor: crosshair !important; }
+
+    .leaflet-control-cal{background:#333;border-radius:6px;padding:4px;cursor:pointer}
+    .leaflet-control-cal img{width:20px;height:20px;filter:invert(1)}
+    .leaflet-control-myscale{background:#333;color:#fff;font:12px sans-serif;
+      padding:4px 8px;border-radius:6px;text-align:left;line-height:1.2}
+    #zoomPct{position:absolute;top:70px;left:10px;background:#222;color:#fff;
+      padding:4px 8px;border-radius:6px;z-index:2000;font:12px sans-serif}
+
+    .msg{position:fixed;inset:0;display:flex;justify-content:center;align-items:center;
+         background:#0008;z-index:3000;visibility:hidden}
+    .msg.show{visibility:visible}
+    .msgbox{background:#222;padding:18px 24px;border-radius:8px;color:#fff;
+           text-align:center;width:260px;font-family:sans-serif}
+    .msgbox input{width:90%;padding:6px;margin-top:8px;border:1px solid #555;
+                  border-radius:4px;background:#111;color:#fff}
+    .msgbox button{margin-top:10px;padding:6px 14px;border:0;border-radius:4px;
+                   background:#08f;color:#fff;cursor:pointer}
+
+    .pinAsk{position:absolute;background:#222;color:#fff;padding:6px 8px;
+            border-radius:6px;box-shadow:0 0 4px #000a;font-family:sans-serif;
+            width:220px;z-index:2500}
+    .pinAsk input{width:100%;padding:4px;margin-top:4px;border:1px solid #555;
+                   border-radius:4px;background:#111;color:#fff}
+    .pinAsk button{margin-top:6px;width:100%;padding:4px;border:0;border-radius:4px;
+                   background:#08f;color:#fff;cursor:pointer}
+
+    .measureTip{background:#222;color:#fff;font:12px sans-serif;padding:4px 6px;
+                border-radius:4px;pointer-events:none}
+    #sig{position:absolute;bottom:10px;right:10px;background:#0008;color:#fff;
+         font:12px sans-serif;padding:4px 8px;border-radius:6px;z-index:1500}
+  </style>
+</head>
+<body>
+
+  <div id="bar">
+    <input type="file" id="picker" accept="image/*" hidden>
+    <button class="action" id="up">Upload Map</button>
+    <span style="align-self:center;color:#ddd;font-size:12px">Pin:</span>
+    <button class="cBtn red"    data-c="red"></button>
+    <button class="cBtn blue"   data-c="blue"></button>
+    <button class="cBtn green"  data-c="green"></button>
+    <button class="cBtn yellow" data-c="yellow"></button>
+    <button class="cBtn purple" data-c="purple"></button>
+    <button class="cBtn orange" data-c="orange"></button>
+  </div>
+
+  <button id="msrBL">Measure</button>
+
+  <div id="msg" class="msg"><div id="msgbox" class="msgbox"></div></div>
+  <div id="map"></div>
+  <div id="sig">Made by Rush Software</div>
+  <div id="zoomPct"></div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
+    import {
+      getDatabase, ref, set, push,
+      onChildAdded, onChildChanged, remove, onValue
+    } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-database.js";
+    import {
+      getStorage, ref as sRef, uploadBytes, getDownloadURL
+    } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-storage.js";
+
+    // Firebase init
+    initializeApp({
+      apiKey: "AIzaSyDFqXVvFss8Kd5sPBdPMQoA_Py56hXK418",
+      databaseURL: "https://rush-fantasy-maps-default-rtdb.firebaseio.com",
+      storageBucket: "rush-fantasy-maps.appspot.com"
+    });
+    const db = getDatabase(), st = getStorage();
+    const cfgRef  = ref(db,"config"), pinsRef = ref(db,"pins");
+
+    // Marker icons
+    const iconURLs = {
+      red:   "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png",
+      blue:  "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png",
+      green: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png",
+      yellow:"https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-yellow.png",
+      purple:"https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-violet.png",
+      orange:"https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-orange.png"
+    };
+    const icons = {};
+    for (let c in iconURLs) {
+      icons[c] = L.icon({ iconUrl:iconURLs[c], iconSize:[25,41], iconAnchor:[12,41] });
+    }
+
+    // State
+    let map, bounds, imgLayer, scaleCtl, calCtl, config=null, mapReady=false;
+    let mode="", currentColour="red", dragStart=null, line=null, liveTip=null;
+    const markers = {};
+
+    const msg = document.getElementById("msg"),
+          box = document.getElementById("msgbox"),
+          zoomDisplay = document.getElementById("zoomPct");
+
+    function pop(text){
+      box.innerHTML = `${text}<br><button id="ok">OK</button>`;
+      msg.classList.add("show");
+      document.getElementById("ok").onclick = ()=> msg.classList.remove("show");
+    }
+    function ask(text, cb){
+      box.innerHTML = `${text}<input id="v"><button id="ok">OK</button>`;
+      msg.classList.add("show");
+      document.getElementById("ok").onclick = ()=>{
+        const v = document.getElementById("v").value.trim();
+        msg.classList.remove("show");
+        cb(v);
+      };
+    }
+
+    // Build map & sync
+    onValue(cfgRef, snap=>{
+      const d = snap.val();
+      if(!d) return pop("Upload a map first.");
+      const imgChanged   = d.mapUrl!==config?.mapUrl;
+      const scaleChanged = d.pxPerUnit!==config?.pxPerUnit||d.unit!==config?.unit;
+      config = d;
+
+      if(!mapReady){
+        map = L.map("map",{crs:L.CRS.Simple,minZoom:-2,maxZoom:6})
+          .on("mousedown", onDown)
+          .on("mousemove", onMove)
+          .on("mouseup",   onUp)
+          .on("zoomend",  ()=>{ buildScale(); updateZoom(); });
+
+        onChildAdded(pinsRef, s=> renderPin(s.key,s.val()));
+        onChildChanged(pinsRef, s=> updatePin(s.key,s.val()));
+
+        // Calibrate control
+        calCtl = L.control({position:"bottomleft"});
+        calCtl.onAdd = ()=>{
+          const d = L.DomUtil.create("div","leaflet-control-cal");
+          d.title="Calibrate scale";
+          d.innerHTML = '<img src="https://img.icons8.com/ios-filled/50/compass.png"/>';
+          L.DomEvent.disableClickPropagation(d);
+          d.onclick = ()=>{
+            map.getContainer().classList.remove("crosshair");
+            map.dragging.enable();
+            mode="cal";
+            pop("Drag to calibrate.");
+          };
+          return d;
+        };
+        calCtl.addTo(map);
+
+        buildScale();
+        updateZoom();
+        mapReady = true;
+      }
+
+      bounds = [[0,0],[d.h,d.w]];
+      if(imgChanged){
+        imgLayer && map.removeLayer(imgLayer);
+        imgLayer = L.imageOverlay(d.mapUrl,bounds).addTo(map);
+        map.fitBounds(bounds);
+      }
+      if(scaleChanged) buildScale();
+    });
+
+    function updateZoom(){
+      const z = map.getZoom();
+      zoomDisplay.innerText = `Zoom: ${(100*Math.pow(2,z)).toFixed(0)}%`;
+    }
+    function buildScale(){
+      if(scaleCtl) map.removeControl(scaleCtl);
+      scaleCtl = L.control({position:"bottomleft"});
+      scaleCtl.onAdd = ()=>{
+        const div = L.DomUtil.create("div","leaflet-control-myscale");
+        const zoomFac = Math.pow(2,map.getZoom()), step=50, max=500;
+        const pxUnit = config.pxPerUnit * zoomFac;
+        let svg = "";
+        for(let m=0;m<=max;m+=step){
+          const x = Math.round(m*pxUnit);
+          svg+=`<line x1="${x}" y1="0" x2="${x}" y2="6" stroke="#fff" stroke-width="2"/>`;
+        }
+        div.innerHTML = `<svg width="${max*pxUnit}" height="6">${svg}</svg><br>0 → ${max} ${config.unit}`;
+        return div;
+      };
+      scaleCtl.addTo(map);
+    }
+
+    // Render pin and attach popup logic
+    function renderPin(id,p){
+      const html = `
+        <div style="font-weight:bold;font-size:15px">${p.label}</div>
+        ${p.url?`<div><a href="${p.url}" target="_blank">Open Link</a></div>`:""}
+        <div style="display:flex;gap:6px;margin-top:6px">
+          <button class="editBtn">✎</button>
+          <button class="delBtn" style="background:#c00;color:#fff;border:0;border-radius:4px;padding:2px 6px">✕</button>
+        </div>`;
+      const m = L.marker([p.x,p.y],{icon:icons[p.color]}).addTo(map).bindPopup(html);
+      markers[id]=m;
+      m.on("popupopen",()=>{
+        const c = m.getPopup().getElement();
+        c.querySelector(".delBtn").onclick=()=>{
+          remove(ref(db,"pins/"+id));
+          map.removeLayer(m);
+        };
+        c.querySelector(".editBtn").onclick=()=>{
+          box.innerHTML=`
+            <div><b>Edit Pin</b></div>
+            <input id="editLabel" value="${p.label}"><br>
+            <input id="editUrl"   value="${p.url||""}"><br>
+            <button id="saveBtn">Save</button>`;
+          msg.classList.add("show");
+          document.getElementById("saveBtn").onclick=()=>{
+            const lbl=document.getElementById("editLabel").value.trim(),
+                  url=document.getElementById("editUrl").value.trim();
+            // Overwrite the pin data in DB:
+            set(ref(db,"pins/"+id),{x:p.x,y:p.y,label:lbl,color:p.color,url});
+            msg.classList.remove("show");
+          };
+        };
+      });
+    }
+
+    // Update existing marker on edit
+    function updatePin(id,p){
+      const m = markers[id];
+      if(!m) return;
+      m.setIcon(icons[p.color]);
+      const html = `
+        <div style="font-weight:bold;font-size:15px">${p.label}</div>
+        ${p.url?`<div><a href="${p.url}" target="_blank">Open Link</a></div>`:""}
+        <div style="display:flex;gap:6px;margin-top:6px">
+          <button class="editBtn">✎</button>
+          <button class="delBtn" style="background:#c00;color:#fff;border:0;border-radius:4px;padding:2px 6px">✕</button>
+        </div>`;
+      m.setPopupContent(html);
+      // re-bind popupopen for delete/edit
+      m.off("popupopen");
+      m.on("popupopen",()=>{
+        const c = m.getPopup().getElement();
+        c.querySelector(".delBtn").onclick=()=>{
+          remove(ref(db,"pins/"+id));
+          map.removeLayer(m);
+        };
+        c.querySelector(".editBtn").onclick=()=>{
+          box.innerHTML=`
+            <div><b>Edit Pin</b></div>
+            <input id="editLabel" value="${p.label}"><br>
+            <input id="editUrl"   value="${p.url||""}"><br>
+            <button id="saveBtn">Save</button>`;
+          msg.classList.add("show");
+          document.getElementById("saveBtn").onclick=()=>{
+            const lbl=document.getElementById("editLabel").value.trim(),
+                  url=document.getElementById("editUrl").value.trim();
+            set(ref(db,"pins/"+id),{x:p.x,y:p.y,label:lbl,color:p.color,url});
+            msg.classList.remove("show");
+          };
+        };
+      });
+    }
+
+    // Measure button
+    document.getElementById("msrBL").onclick = ()=>{
+      map.getContainer().classList.add("crosshair");
+      map.dragging.disable();
+      mode="measure";
+      // clear any old line:
+      if(line){ map.removeLayer(line); line=null; }
+    };
+
+    // Drag handlers
+    function onDown(e){
+      if(mode==="pin"){ pinPrompt(e.latlng); return; }
+      if(mode==="measure"||mode==="cal"){
+        dragStart = e.latlng;
+        line = L.polyline([dragStart,dragStart],{
+          color: mode==="measure"?"#0af":"#fa0", weight:2
+        }).addTo(map);
+        liveTip = L.popup({closeButton:false,className:"measureTip"})
+                   .setLatLng(dragStart).setContent("0 "+config.unit)
+                   .openOn(map);
+      }
+    }
+    function onMove(e){
+      if(!line) return;
+      line.setLatLngs([dragStart,e.latlng]);
+      const px = map.latLngToLayerPoint(dragStart)
+                     .distanceTo(map.latLngToLayerPoint(e.latlng));
+      const val = mode==="measure"
+        ? (px/(config.pxPerUnit*Math.pow(2,map.getZoom()))).toFixed(1)+" "+config.unit
+        : px.toFixed(0)+" px";
+      liveTip.setLatLng(e.latlng).setContent(val);
+    }
+    function onUp(e){
+      if(!line) return;
+      const px = map.latLngToLayerPoint(dragStart)
+                     .distanceTo(map.latLngToLayerPoint(e.latlng));
+
+      // remove the temporary line & popup
+      map.removeLayer(line);
+      map.closePopup(liveTip);
+      line = liveTip = null;
+
+      // clear crosshair & restore pan
+      map.getContainer().classList.remove("crosshair");
+      map.dragging.enable();
+
+      if(mode==="cal"){
+        ask(`Pixels: ${px.toFixed(0)} → real distance (e.g. 120 mi):`, v=>{
+          const m=v.match(/^([\d.]+)\s*(mi|km)$/i);
+          if(m){
+            set(cfgRef,{
+              ...config,
+              pxPerUnit: px/(parseFloat(m[1])*Math.pow(2,map.getZoom())),
+              unit: m[2].toLowerCase()
+            });
+          }
+        });
+      } else if(mode==="measure"){
+        L.popup({closeButton:false})
+         .setLatLng(e.latlng)
+         .setContent((px/(config.pxPerUnit*Math.pow(2,map.getZoom()))).toFixed(1)+" "+config.unit)
+         .openOn(map);
+      }
+
+      mode = "";
+    }
+
+    // Pin prompt
+    function pinPrompt(latlng){
+      const pt=map.latLngToContainerPoint(latlng);
+      const div=document.createElement("div"); div.className="pinAsk";
+      div.style.left=`${pt.x-110}px`; div.style.top=`${pt.y-10}px`;
+      div.innerHTML=`Label:<input id="t"><br>URL:<input id="u"><br><button id="a">OK</button>`;
+      document.body.appendChild(div);
+      document.getElementById("a").onclick=()=>{
+        const lbl=document.getElementById("t").value.trim(),
+              url=document.getElementById("u").value.trim();
+        div.remove();
+        if(lbl) push(pinsRef,{x:latlng.lat,y:latlng.lng,label:lbl,color:currentColour,url});
+      };
+      map.getContainer().classList.remove("crosshair");
+      map.dragging.enable();
+      mode="";
+    }
+
+    // Upload map
+    document.getElementById("up").onclick = ()=> picker.click();
+    picker.onchange = async e=>{
+      const f=e.target.files[0]; if(!f)return;
+      const img=new Image(); img.onload=async()=>{
+        const path="maps/current"; await uploadBytes(sRef(st,path),f);
+        const url=await getDownloadURL(sRef(st,path));
+        set(cfgRef,{mapUrl:url,w:img.naturalWidth,h:img.naturalHeight,pxPerUnit:20,unit:'mi'});
+      }; img.src=URL.createObjectURL(f);
+    };
+
+    // Pin colours
+    document.querySelectorAll(".cBtn").forEach(b=>{
+      b.onclick = ()=>{ currentColour = b.dataset.c; mode="pin"; };
+    });
+  </script>
+</body>
+</html>
