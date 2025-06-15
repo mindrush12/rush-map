@@ -7,10 +7,8 @@
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <style>
     html, body, #map {
-      height:100%;
-      margin:0;
+      height:100%; margin:0;
       touch-action: none;
-      -webkit-user-select: none;
       user-select: none;
       -webkit-touch-callout: none;
     }
@@ -39,32 +37,31 @@
     .leaflet-control-cal     { order:1 }
     .leaflet-control-measure { order:2 }
     .leaflet-control-myscale { order:3 }
-    .leaflet-control-cal img {
-      width:20px; height:20px; filter:invert(1); vertical-align:middle;
-    }
+    .leaflet-control-cal img { width:20px; height:20px; filter:invert(1); }
     .leaflet-control-myscale svg { overflow:visible; display:block; }
     .leaflet-container.crosshair { cursor: crosshair!important; }
-    /* Popup/messages */
-    .msg {
-      position:fixed; inset:0; display:flex;
+
+    /* Popups & messages */
+    .msg { position:fixed; inset:0; display:flex;
       justify-content:center; align-items:center;
       background:#0008; z-index:3000; visibility:hidden;
     }
     .msg.show { visibility:visible; }
     .msgbox {
-      background:#222; padding:12px 16px; border-radius:6px;
+      background:#222; padding:12px; border-radius:6px;
       color:#fff; text-align:center; width:240px; font-family:sans-serif;
     }
     .msgbox input {
       width:90%; padding:4px; margin-top:6px;
-      border:1px solid #555; border-radius:4px;
-      background:#111; color:#fff;
+      background:#111; border:1px solid #555; border-radius:4px;
+      color:#fff;
     }
     .msgbox button {
       margin-top:8px; padding:4px 12px;
-      border:0; border-radius:4px;
-      background:#08f; color:#fff; cursor:pointer;
+      background:#08f; border:none; border-radius:4px;
+      color:#fff; cursor:pointer;
     }
+
     /* Pin prompt */
     .pinAsk {
       position:absolute; background:#222; color:#fff;
@@ -74,8 +71,8 @@
     }
     .pinAsk input {
       width:100%; padding:4px; margin-top:4px;
-      border:1px solid #555; border-radius:4px;
-      background:#111; color:#fff;
+      background:#111; border:1px solid #555; border-radius:4px;
+      color:#fff;
     }
     .pinAsk .color-picker {
       display:flex; gap:4px; margin:6px 0; justify-content:center;
@@ -84,15 +81,19 @@
       width:18px; height:18px; border:2px solid #fff;
       border-radius:4px; cursor:pointer; padding:0;
     }
+
+    /* Measure tip */
     .measureTip {
       background:#222; color:#fff;
-      font:12px sans-serif; padding:4px 6px;
-      border-radius:4px; pointer-events:none;
+      padding:4px 6px; border-radius:4px;
+      font:12px sans-serif; pointer-events:none;
     }
+
+    /* Signature */
     #sig {
       position:absolute; bottom:10px; right:10px;
       background:#0008; color:#fff;
-      font:12px sans-serif; padding:4px 8px;
+      padding:4px 8px; font:12px sans-serif;
       border-radius:6px; z-index:1500;
     }
   </style>
@@ -122,20 +123,19 @@
 
     let map, imgLayer, scaleCtl, calCtl, measureCtl,
         config=null, mode="", measurePts=[], calPts=[],
-        holdTimer=null, icons={}, markers={},
-        currentColour="red";
+        holdTimer=null, icons={}, markers={}, currentColour="red";
 
     const msg = document.getElementById("msg"),
           box = document.getElementById("msgbox"),
           zoomDisplay = document.getElementById("zoomPct");
 
-    function pop(text) {
-      box.innerHTML = `${text}<br><button id="ok">OK</button>`;
+    function pop(txt) {
+      box.innerHTML = `${txt}<br><button id="ok">OK</button>`;
       msg.classList.add("show");
       document.getElementById("ok").onclick = () => msg.classList.remove("show");
     }
-    function ask(text, cb) {
-      box.innerHTML = `${text}<input id="v"><button id="ok">OK</button>`;
+    function ask(txt, cb) {
+      box.innerHTML = `${txt}<input id="v"><button id="ok">OK</button>`;
       msg.classList.add("show");
       document.getElementById("ok").onclick = () => {
         cb(document.getElementById("v").value.trim());
@@ -151,8 +151,7 @@
       div.innerHTML = `
         Label:<input id="t"><br>
         URL:<input id="u"><br>
-        Color:
-        <div class="color-picker">
+        Color:<div class="color-picker">
           <button data-c="red"   style="background:#d33"></button>
           <button data-c="blue"  style="background:#36c"></button>
           <button data-c="green" style="background:#3a3"></button>
@@ -162,12 +161,14 @@
         </div>
         <button id="a">OK</button>`;
       document.body.appendChild(div);
-      const rect = div.getBoundingClientRect(),
+
+      // clamp into view
+      const r = div.getBoundingClientRect(),
             vw = innerWidth, vh = innerHeight;
       if (left < 4) left = 4;
-      if (left + rect.width > vw - 4) left = vw - rect.width - 4;
-      if (top < 4) top = 4;
-      if (top + rect.height > vh - 4) top = vh - rect.height - 4;
+      if (left + r.width > vw - 4) left = vw - r.width - 4;
+      if (top  < 4) top  = 4;
+      if (top  + r.height > vh - 4) top  = vh - r.height - 4;
       div.style.left = `${left}px`;
       div.style.top  = `${top}px`;
 
@@ -197,10 +198,10 @@
           const [a,b] = measurePts;
           const px = map.latLngToLayerPoint(a)
                       .distanceTo(map.latLngToLayerPoint(b));
-          const dist = (px/(config.pxPerUnit*Math.pow(2,map.getZoom())))
-                       .toFixed(1)+" "+config.unit;
+          const d = (px/(config.pxPerUnit*Math.pow(2,map.getZoom())))
+                    .toFixed(1)+" "+config.unit;
           L.popup({closeButton:false})
-           .setLatLng(b).setContent(dist).openOn(map);
+           .setLatLng(b).setContent(d).openOn(map);
           map.getContainer().classList.remove("crosshair");
           mode=""; measurePts=[];
         }
@@ -227,7 +228,6 @@
 
     function setupHoldListener() {
       const container = map.getContainer();
-
       function toLatLng(e) {
         const t = e.changedTouches ? e.changedTouches[0] : e;
         const r = container.getBoundingClientRect();
@@ -235,25 +235,30 @@
           L.point(t.clientX - r.left, t.clientY - r.top)
         );
       }
-      function startHold(e) {
-        // ignore pinch/multi-touch
+
+      function onPointerDown(e) {
+        // only on bare map background
+        if (e.target !== container) return;
+        // ignore pinch/multi
         if (e.pointerType==="touch" && !e.isPrimary) return;
+        // start 750 ms timer
+        const pt = toLatLng(e);
         holdTimer = setTimeout(() => {
-          pinPrompt(toLatLng(e));
+          pinPrompt(pt);
         }, 750);
-      }
-      function cancelHold() {
-        clearTimeout(holdTimer);
+        // capture pointer so moves/up still fire here
+        container.setPointerCapture(e.pointerId);
       }
 
-      container.addEventListener("pointerdown",  startHold);
-      container.addEventListener("pointerup",    cancelHold);
+      function cancelHold(e) {
+        clearTimeout(holdTimer);
+        try { container.releasePointerCapture(e.pointerId); } catch {}
+      }
+
+      container.addEventListener("pointerdown",  onPointerDown);
       container.addEventListener("pointermove",  cancelHold);
+      container.addEventListener("pointerup",    cancelHold);
       container.addEventListener("pointercancel",cancelHold);
-      // support mouse separately
-      container.addEventListener("mousedown", startHold);
-      container.addEventListener("mouseup",   cancelHold);
-      container.addEventListener("mousemove", cancelHold);
     }
 
     function renderPin(id,p) {
@@ -264,36 +269,38 @@
           <button class="editBtn">✎</button>
           <button class="delBtn" style="background:#c00;color:#fff;border:0;border-radius:4px;padding:2px 6px">✕</button>
         </div>`;
-      const m = L.marker([p.x,p.y],{icon:icons[p.color]}).addTo(map).bindPopup(html);
-      markers[id]=m;
-      m.on("popupopen",()=>{
-        const c=m.getPopup().getElement();
-        c.querySelector(".delBtn").onclick=()=>{
-          remove(ref(db,"pins/"+id)); map.removeLayer(m);
+      const m = L.marker([p.x,p.y],{icon:icons[p.color]})
+                    .addTo(map).bindPopup(html);
+      markers[id] = m;
+      m.on("popupopen", ()=>{
+        const c = m.getPopup().getElement();
+        c.querySelector(".delBtn").onclick = ()=>{
+          remove(ref(db,"pins/"+id));
+          map.removeLayer(m);
         };
-        c.querySelector(".editBtn").onclick=()=>{
-          box.innerHTML=`
+        c.querySelector(".editBtn").onclick = ()=>{
+          box.innerHTML = `
             <div><b>Edit Pin</b></div>
             Label:<input id="editLabel" value="${p.label}"><br>
             URL:<input id="editUrl"   value="${p.url||""}"><br>
             <button id="saveBtn">Save</button>`;
           msg.classList.add("show");
-          document.getElementById("saveBtn").onclick=()=>{
-            const lbl=document.getElementById("editLabel").value.trim(),
-                  url=document.getElementById("editUrl").value.trim();
-            set(ref(db,"pins/"+id),{x:p.x,y:p.y,label:lbl,color:p.color,url});
+          document.getElementById("saveBtn").onclick = ()=>{
+            const lbl = document.getElementById("editLabel").value.trim(),
+                  url = document.getElementById("editUrl").value.trim();
+            set(ref(db,"pins/"+id),{ x:p.x,y:p.y,label:lbl,color:p.color,url });
             msg.classList.remove("show");
           };
         };
       });
     }
-    function updatePin(id,p) {
-      if(markers[id]) map.removeLayer(markers[id]);
+    function updatePin(id,p){
+      if (markers[id]) map.removeLayer(markers[id]);
       renderPin(id,p);
     }
 
     function updateZoom(){
-      zoomDisplay.innerText=`Zoom: ${(100*Math.pow(2,map.getZoom())).toFixed(0)}%`;
+      zoomDisplay.innerText = `Zoom: ${(100*Math.pow(2,map.getZoom())).toFixed(0)}%`;
     }
 
     const firebaseConfig = {
@@ -309,16 +316,16 @@
 
     document.getElementById("up").onclick = ()=>picker.click();
     const picker = document.getElementById("picker");
-    picker.onchange=async e=>{
-      const file=e.target.files[0]; if(!file) return;
-      const img=new Image();
-      img.onload=async ()=>{
-        const path=`maps/${Date.now()}_${file.name}`;
+    picker.onchange = async e => {
+      const file = e.target.files[0]; if (!file) return;
+      const img = new Image();
+      img.onload = async () => {
+        const path = `maps/${Date.now()}_${file.name}`;
         await uploadBytes(sRef(st,path),file);
-        const url=await getDownloadURL(sRef(st,path));
-        set(cfgRef,{mapUrl:url,w:img.naturalWidth,h:img.naturalHeight,pxPerUnit:20,unit:"mi"});
+        const url = await getDownloadURL(sRef(st,path));
+        set(cfgRef,{ mapUrl:url, w:img.naturalWidth, h:img.naturalHeight, pxPerUnit:20, unit:"mi" });
       };
-      img.src=URL.createObjectURL(file);
+      img.src = URL.createObjectURL(file);
     };
 
     const iconURLs = {
@@ -329,73 +336,76 @@
       purple:"https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-violet.png",
       orange:"https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-orange.png"
     };
-    for(let c in iconURLs){
-      icons[c]=L.icon({iconUrl:iconURLs[c],iconSize:[25,41],iconAnchor:[12,41]});
+    for (let c in iconURLs) {
+      icons[c] = L.icon({ iconUrl:iconURLs[c], iconSize:[25,41], iconAnchor:[12,41] });
     }
 
     onValue(cfgRef,snap=>{
-      const d=snap.val(); if(!d){ pop("Upload a map first."); return; }
+      const d=snap.val(); if (!d) { pop("Upload a map first."); return; }
       config=d;
-      if(!map){
-        map=L.map("map",{crs:L.CRS.Simple,minZoom:-5,maxZoom:6})
-          .on("click",onMapClick)
-          .on("zoomend",()=>{buildScale();updateZoom();});
+      if (!map) {
+        map = L.map("map", { crs:L.CRS.Simple, minZoom:-5, maxZoom:6 })
+          .on("click", onMapClick)
+          .on("zoomend", ()=>{ buildScale(); updateZoom(); });
         setupHoldListener();
-        onChildAdded(pinsRef,s=>renderPin(s.key,s.val()));
-        onChildChanged(pinsRef,s=>updatePin(s.key,s.val()));
-        calCtl=L.control({position:"bottomleft"});
-        calCtl.onAdd=()=>{
-          const el=L.DomUtil.create("div","leaflet-control-cal");
-          el.title="Calibrate";el.innerHTML='<img src="https://img.icons8.com/ios-filled/50/compass.png"/>';
+        onChildAdded(pinsRef, s=>renderPin(s.key,s.val()));
+        onChildChanged(pinsRef, s=>updatePin(s.key,s.val()));
+
+        calCtl = L.control({position:"bottomleft"});
+        calCtl.onAdd = () => {
+          const el = L.DomUtil.create("div","leaflet-control-cal");
+          el.title="Calibrate"; el.innerHTML='<img src="https://img.icons8.com/ios-filled/50/compass.png"/>';
           L.DomEvent.disableClickPropagation(el);
-          el.onclick=()=>{
-            mode="cal";calPts=[];map.getContainer().classList.add("crosshair");
+          el.onclick = ()=> {
+            mode="cal"; calPts=[]; map.getContainer().classList.add("crosshair");
             pop("Click two points to calibrate");
           };
           return el;
         };
         calCtl.addTo(map);
-        measureCtl=L.control({position:"bottomleft"});
-        measureCtl.onAdd=()=>{
-          const btn=L.DomUtil.create("div","leaflet-control-measure");
+
+        measureCtl = L.control({position:"bottomleft"});
+        measureCtl.onAdd = () => {
+          const btn = L.DomUtil.create("div","leaflet-control-measure");
           btn.innerText="Measure";
           L.DomEvent.disableClickPropagation(btn);
-          btn.onclick=()=>{
-            mode="measure";measurePts=[];map.getContainer().classList.add("crosshair");
+          btn.onclick = ()=> {
+            mode="measure"; measurePts=[]; map.getContainer().classList.add("crosshair");
             pop("Click two points to measure");
           };
           return btn;
         };
         measureCtl.addTo(map);
       }
-      const bounds=[[0,0],[d.h,d.w]];
-      if(imgLayer) map.removeLayer(imgLayer);
-      imgLayer=L.imageOverlay(d.mapUrl,bounds).addTo(map);
+
+      const bounds = [[0,0],[d.h,d.w]];
+      if (imgLayer) map.removeLayer(imgLayer);
+      imgLayer = L.imageOverlay(d.mapUrl,bounds).addTo(map);
       map.fitBounds(bounds);
       buildScale(); updateZoom();
     });
 
     function buildScale(){
-      if(!config) return;
-      if(scaleCtl) map.removeControl(scaleCtl);
-      scaleCtl=L.control({position:"bottomleft"});
-      scaleCtl.onAdd=()=>{
-        const div=L.DomUtil.create("div","leaflet-control-myscale");
-        const meterW=Math.round(map.getSize().x*0.2),
-              pxU=config.pxPerUnit*Math.pow(2,map.getZoom()),
-              max=500;
-        let lines="",labels="";
-        for(let m=0;m<=max;m+=50){
-          const x=Math.round(m*pxU);
-          if(x<=meterW){
-            const len=(m%100===0?4:2);
-            lines+=`<line x1="${x}" y1="0" x2="${x}" y2="${len}" stroke="#fff" stroke-width="1"/>`;
-            if(m%100===0){
-              labels+=`<text x="${x}" y="12" font-size="10" fill="#fff" text-anchor="middle">${m}</text>`;
+      if (!config) return;
+      if (scaleCtl) map.removeControl(scaleCtl);
+      scaleCtl = L.control({position:"bottomleft"});
+      scaleCtl.onAdd = () => {
+        const div = L.DomUtil.create("div","leaflet-control-myscale");
+        const meterW = Math.round(map.getSize().x * 0.2),
+              pxU    = config.pxPerUnit * Math.pow(2,map.getZoom()),
+              max    = 500;
+        let lines="", labels="";
+        for (let m=0; m<=max; m+=50) {
+          const x = Math.round(m * pxU);
+          if (x <= meterW) {
+            const len = (m % 100 === 0 ? 4 : 2);
+            lines  += `<line x1="${x}" y1="0" x2="${x}" y2="${len}" stroke="#fff" stroke-width="1"/>`;
+            if (m % 100 === 0) {
+              labels += `<text x="${x}" y="12" font-size="10" fill="#fff" text-anchor="middle">${m}</text>`;
             }
           }
         }
-        div.innerHTML=`<svg width="${meterW}" height="16">${lines}${labels}</svg>`;
+        div.innerHTML = `<svg width="${meterW}" height="16">${lines}${labels}</svg>`;
         return div;
       };
       scaleCtl.addTo(map);
