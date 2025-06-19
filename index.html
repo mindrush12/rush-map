@@ -2,6 +2,8 @@
 <html>
 <head>
   <meta charset="utf-8" />
+  <!-- ensure mobile devices report correct width -->
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Rush Fantasy Map</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
@@ -13,7 +15,7 @@
       -webkit-touch-callout: none;
     }
 
-    /* Prevent *any* selection or tap-highlight inside Leaflet */
+    /* prevent any selection or tap-highlight inside Leaflet */
     .leaflet-container, .leaflet-container * {
       user-select: none !important;
       -webkit-user-select: none !important;
@@ -107,8 +109,8 @@
       border-radius:6px; z-index:1500;
     }
 
-    /* MOBILE: make all UI elements & markers ~3× larger */
-    @media (max-width: 768px) {
+    /* TOUCH DEVICES: scale up UI & markers ~3× */
+    @media (pointer: coarse) {
       /* Top bar */
       #bar {
         transform: scale(3);
@@ -121,7 +123,7 @@
         transform: scale(3);
         transform-origin: bottom left;
       }
-      /* Pin‐prompt popup */
+      /* Pin prompt */
       .pinAsk {
         transform: scale(3);
         transform-origin: top left;
@@ -199,7 +201,9 @@
         <button id="a">OK</button>`;
       document.body.appendChild(div);
 
-      const r = div.getBoundingClientRect(), vw = innerWidth, vh = innerHeight;
+      // clamp into view
+      const r = div.getBoundingClientRect(),
+            vw = innerWidth, vh = innerHeight;
       if (left < 4) left = 4;
       if (left + r.width > vw - 4) left = vw - r.width - 4;
       if (top  < 4) top  = 4;
@@ -322,7 +326,7 @@
       });
     }
     function updatePin(id,p){
-      if(markers[id]) map.removeLayer(markers[id]);
+      if (markers[id]) map.removeLayer(markers[id]);
       renderPin(id,p);
     }
 
@@ -368,14 +372,14 @@
     }
 
     onValue(cfgRef,snap=>{
-      const d = snap.val(); if (!d) { pop("Upload a map first."); return; }
-      config = d;
+      const d=snap.val(); if (!d) { pop("Upload a map first."); return; }
+      config=d;
       if (!map) {
-        map = L.map("map",{ crs:L.CRS.Simple, minZoom:-5, maxZoom:6 })
+        map = L.map("map", { crs:L.CRS.Simple, minZoom:-5, maxZoom:6 })
           .on("click", onMapClick)
           .on("zoomend", ()=>{ buildScale(); updateZoom(); });
         setupHoldListener();
-        onChildAdded(pinsRef,   s=>renderPin(s.key,s.val()));
+        onChildAdded(pinsRef, s=>renderPin(s.key,s.val()));
         onChildChanged(pinsRef, s=>updatePin(s.key,s.val()));
 
         calCtl = L.control({position:"bottomleft"});
@@ -383,7 +387,10 @@
           const el = L.DomUtil.create("div","leaflet-control-cal");
           el.title="Calibrate"; el.innerHTML='<img src="https://img.icons8.com/ios-filled/50/compass.png"/>';
           L.DomEvent.disableClickPropagation(el);
-          el.onclick = ()=>{ mode="cal"; calPts=[]; map.getContainer().classList.add("crosshair"); pop("Click two points to calibrate"); };
+          el.onclick = ()=> {
+            mode="cal"; calPts=[]; map.getContainer().classList.add("crosshair");
+            pop("Click two points to calibrate");
+          };
           return el;
         };
         calCtl.addTo(map);
@@ -393,7 +400,10 @@
           const btn = L.DomUtil.create("div","leaflet-control-measure");
           btn.innerText="Measure";
           L.DomEvent.disableClickPropagation(btn);
-          btn.onclick = ()=>{ mode="measure"; measurePts=[]; map.getContainer().classList.add("crosshair"); pop("Click two points to measure"); };
+          btn.onclick = ()=> {
+            mode="measure"; measurePts=[]; map.getContainer().classList.add("crosshair");
+            pop("Click two points to measure");
+          };
           return btn;
         };
         measureCtl.addTo(map);
