@@ -2,7 +2,6 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <!-- ensure mobile devices report correct width -->
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Rush Fantasy Map</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
@@ -109,29 +108,25 @@
       border-radius:6px; z-index:1500;
     }
 
-    /* TOUCH DEVICES: scale up UI & markers ~3× */
+    /* TOUCH DEVICES: scale up UI & markers ~2× */
     @media (pointer: coarse) {
-      /* Top bar */
       #bar {
-        transform: scale(3);
+        transform: scale(2);
         transform-origin: top center;
       }
-      /* Bottom-left controls */
       .leaflet-control-cal,
       .leaflet-control-measure,
       .leaflet-control-myscale {
-        transform: scale(3);
+        transform: scale(2);
         transform-origin: bottom left;
       }
-      /* Pin prompt */
       .pinAsk {
-        transform: scale(3);
+        transform: scale(2);
         transform-origin: top left;
       }
-      /* Marker icons & shadows */
       .leaflet-marker-icon,
       .leaflet-marker-shadow {
-        transform: scale(3) !important;
+        transform: scale(2) !important;
         transform-origin: bottom center !important;
       }
     }
@@ -201,9 +196,7 @@
         <button id="a">OK</button>`;
       document.body.appendChild(div);
 
-      // clamp into view
-      const r = div.getBoundingClientRect(),
-            vw = innerWidth, vh = innerHeight;
+      const r = div.getBoundingClientRect(), vw = innerWidth, vh = innerHeight;
       if (left < 4) left = 4;
       if (left + r.width > vw - 4) left = vw - r.width - 4;
       if (top  < 4) top  = 4;
@@ -274,7 +267,6 @@
           L.point(t.clientX - r.left, t.clientY - r.top)
         );
       }
-
       function onPointerDown(e) {
         if (e.target !== container) return;
         if (e.pointerType==="touch" && !e.isPrimary) return;
@@ -286,7 +278,6 @@
         clearTimeout(holdTimer);
         try { container.releasePointerCapture(e.pointerId); } catch {}
       }
-
       container.addEventListener("pointerdown",  onPointerDown);
       container.addEventListener("pointermove",  cancelHold);
       container.addEventListener("pointerup",    cancelHold);
