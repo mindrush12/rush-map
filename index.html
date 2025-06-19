@@ -12,6 +12,15 @@
       user-select: none;
       -webkit-touch-callout: none;
     }
+
+    /* Prevent *any* selection or tap-highlight inside Leaflet */
+    .leaflet-container, .leaflet-container * {
+      user-select: none !important;
+      -webkit-user-select: none !important;
+      -ms-user-select: none !important;
+      -webkit-tap-highlight-color: transparent !important;
+    }
+
     /* Top bar */
     #bar {
       position:absolute; top:10px; left:50%; transform:translateX(-50%);
@@ -22,6 +31,7 @@
       border:0; border-radius:4px; padding:6px 12px;
       background:#555; color:#fff; cursor:pointer; font-size:14px;
     }
+
     /* Bottom-left controls */
     .leaflet-bottom.leaflet-left {
       display:flex !important; gap:8px;
@@ -99,12 +109,12 @@
 
     /* MOBILE: make all UI elements & markers ~3× larger */
     @media (max-width: 768px) {
-      /* Top bar and its buttons */
+      /* Top bar */
       #bar {
         transform: scale(3);
         transform-origin: top center;
       }
-      /* Bottom-left controls: calibrate, measure, scale */
+      /* Bottom-left controls */
       .leaflet-control-cal,
       .leaflet-control-measure,
       .leaflet-control-myscale {
@@ -116,11 +126,11 @@
         transform: scale(3);
         transform-origin: top left;
       }
-      /* Marker icons */
+      /* Marker icons & shadows */
       .leaflet-marker-icon,
       .leaflet-marker-shadow {
-        transform: scale(3);
-        transform-origin: bottom center;
+        transform: scale(3) !important;
+        transform-origin: bottom center !important;
       }
     }
   </style>
