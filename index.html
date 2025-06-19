@@ -23,8 +23,7 @@
       border:0; border-radius:4px; padding:6px 12px;
       background:#555; color:#fff; cursor:pointer; font-size:14px;
     }
-
-    /* Bottom-left controls—default = 1× */
+    /* Bottom-left controls—default 1× */
     .leaflet-bottom.leaflet-left {
       display:flex !important; gap:8px;
       bottom:4px!important; left:4px!important; z-index:2000;
@@ -45,9 +44,8 @@
     .leaflet-control-myscale svg { overflow:visible; display:block; }
     .leaflet-container.crosshair { cursor: crosshair!important; }
 
-    /* Overlay sizing rules */
-
-/* 1) Desktop embedded — 0.75× */
+    /* Sizing rules per context */
+    /* 1) Desktop embed → 0.75× */
     body.embedded:not(.mobile)
       .leaflet-control-cal,
     body.embedded:not(.mobile)
@@ -56,8 +54,7 @@
       .leaflet-control-myscale {
       transform: scale(0.75);
     }
-
-/* 2) Mobile standalone — 1.5× */
+    /* 2) Mobile standalone → 1.5× */
     body.mobile:not(.embedded)
       .leaflet-control-cal,
     body.mobile:not(.embedded)
@@ -66,8 +63,7 @@
       .leaflet-control-myscale {
       transform: scale(1.5);
     }
-
-/* 3) Mobile embedded — 1× */
+    /* 3) Mobile embed → 1× */
     body.mobile.embedded
       .leaflet-control-cal,
     body.mobile.embedded
@@ -78,7 +74,8 @@
     }
 
     /* Popups & messages */
-    .msg { position:fixed; inset:0; display:flex;
+    .msg {
+      position:fixed; inset:0; display:flex;
       justify-content:center; align-items:center;
       background:#0008; z-index:3000; visibility:hidden;
     }
@@ -135,22 +132,19 @@
   </style>
 </head>
 <body>
+
   <div id="bar">
     <input type="file" id="picker" accept="image/*" hidden>
     <button class="action" id="up">Upload Map</button>
   </div>
+
   <div id="map"></div>
   <div id="zoomPct"></div>
   <div id="sig">Made by Rush Software</div>
   <div id="msg" class="msg"><div id="msgbox" class="msgbox"></div></div>
 
   <script type="module">
-    // detect embedded vs standalone
-    if (window.self !== window.top) document.body.classList.add('embedded');
-    // detect mobile (coarse pointer)
-    if (window.matchMedia('(pointer: coarse)').matches)
-      document.body.classList.add('mobile');
-
+    // --- imports must come first in an ES module ---
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
     import {
       getDatabase, ref, set, push,
@@ -161,6 +155,12 @@
       uploadBytes, getDownloadURL
     } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-storage.js";
 
+    // now detection logic
+    if (window.self !== window.top) document.body.classList.add('embedded');
+    if (window.matchMedia('(pointer: coarse)').matches)
+      document.body.classList.add('mobile');
+
+    // --- rest of your working code ---
     let map, imgLayer, scaleCtl, calCtl, measureCtl,
         config=null, mode="", measurePts=[], calPts=[],
         holdTimer=null, icons={}, markers={}, currentColour="red";
@@ -302,13 +302,42 @@
       const m = L.marker([p.x,p.y],{icon:icons[p.color]})
                     .addTo(map).bindPopup(html);
       markers[id] = m;
-      m.on("popupopen", ()=>{…});
+      m.on("popupopen", ()=>{
+        const c = m.getPopup().getElement();
+        c.querySelector(".delBtn").onclick = ()=>{
+          remove(ref(db,"pins/"+id));
+          map.removeLayer(m);
+        };
+        c.querySelector(".editBtn").onclick = ()=>{
+          box.innerHTML = `
+            <div><b>Edit Pin</b></div>
+            Label:<input id="editLabel" value="${p.label}"><br>
+            URL:<input id="editUrl"   value="${p.url||""}"><br>
+            <button id="saveBtn">Save</button>`;
+          msg.classList.add("show");
+          document.getElementById("saveBtn").onclick = ()=>{
+            const lbl = document.getElementById("editLabel").value.trim(),
+                  url = document.getElementById("editUrl").value.trim();
+            set(ref(db,"pins/"+id),{ x:p.x,y:p.y,label:lbl,color:p.color,url });
+            msg.classList.remove("show");
+          };
+        };
+      });
     }
-    function updatePin(id,p){…}
+    function updatePin(id,p){
+      if (markers[id]) map.removeLayer(markers[id]);
+      renderPin(id,p);
+    }
 
-    function updateZoom() {…}
+    function updateZoom(){
+      zoomDisplay.innerText = `Zoom: ${(100*Math.pow(2,map.getZoom())).toFixed(0)}%`;
+    }
 
-    const firebaseConfig = { … };
+    const firebaseConfig = {
+      apiKey:       "AIzaSyAvOYFqN4QaygGY-vzECYZJKUBZBCjddvg",
+      databaseURL:  "https://rush-fantasy-maps-default-rtdb.firebaseio.com",
+      storageBucket:"rush-fantasy-maps.firebasestorage.app"
+    };
     const app = initializeApp(firebaseConfig),
           db  = getDatabase(app),
           st  = getStorage(app),
@@ -317,15 +346,100 @@
 
     document.getElementById("up").onclick = ()=>picker.click();
     const picker = document.getElementById("picker");
-    picker.onchange = async e => { … };
+    picker.onchange = async e => {
+      const file = e.target.files[0]; if (!file) return;
+      const img = new Image();
+      img.onload = async () => {
+        const path = `maps/${Date.now()}_${file.name}`;
+        await uploadBytes(sRef(st,path),file);
+        const url = await getDownloadURL(sRef(st,path));
+        set(cfgRef,{ mapUrl:url, w:img.naturalWidth, h:img.naturalHeight, pxPerUnit:20, unit:"mi" });
+      };
+      img.src = URL.createObjectURL(file);
+    };
 
-    const iconURLs = { … };
+    const iconURLs = {
+      red:"https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png",
+      blue:"https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png",
+      green:"https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png",
+      yellow:"https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-yellow.png",
+      purple:"https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-violet.png",
+      orange:"https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-orange.png"
+    };
     for (let c in iconURLs) {
       icons[c] = L.icon({ iconUrl:iconURLs[c], iconSize:[25,41], iconAnchor:[12,41] });
     }
 
-    onValue(cfgRef,snap=>{ … });
-    function buildScale(){ … }
+    onValue(cfgRef,snap=>{
+      const d=snap.val(); if (!d) { pop("Upload a map first."); return; }
+      config=d;
+      if (!map) {
+        map = L.map("map", { crs:L.CRS.Simple, minZoom:-5, maxZoom:6 })
+          .on("click", onMapClick)
+          .on("zoomend", ()=>{ buildScale(); updateZoom(); });
+        setupHoldListener();
+        onChildAdded(pinsRef, s=>renderPin(s.key,s.val()));
+        onChildChanged(pinsRef, s=>updatePin(s.key,s.val()));
+
+        calCtl = L.control({position:"bottomleft"});
+        calCtl.onAdd = () => {
+          const el = L.DomUtil.create("div","leaflet-control-cal");
+          el.title="Calibrate"; el.innerHTML='<img src="https://img.icons8.com/ios-filled/50/compass.png"/>';
+          L.DomEvent.disableClickPropagation(el);
+          el.onclick = ()=> {
+            mode="cal"; calPts=[]; map.getContainer().classList.add("crosshair");
+            pop("Click two points to calibrate");
+          };
+          return el;
+        };
+        calCtl.addTo(map);
+
+        measureCtl = L.control({position:"bottomleft"});
+        measureCtl.onAdd = () => {
+          const btn = L.DomUtil.create("div","leaflet-control-measure");
+          btn.innerText="Measure";
+          L.DomEvent.disableClickPropagation(btn);
+          btn.onclick = ()=> {
+            mode="measure"; measurePts=[]; map.getContainer().classList.add("crosshair");
+            pop("Click two points to measure");
+          };
+          return btn;
+        };
+        measureCtl.addTo(map);
+      }
+
+      const bounds = [[0,0],[d.h,d.w]];
+      if (imgLayer) map.removeLayer(imgLayer);
+      imgLayer = L.imageOverlay(d.mapUrl,bounds).addTo(map);
+      map.fitBounds(bounds);
+      buildScale(); updateZoom();
+    });
+
+    function buildScale(){
+      if (!config) return;
+      if (scaleCtl) map.removeControl(scaleCtl);
+      scaleCtl = L.control({position:"bottomleft"});
+      scaleCtl.onAdd = () => {
+        const div = L.DomUtil.create("div","leaflet-control-myscale");
+        const meterW = Math.round(map.getSize().x * 0.2),
+              pxU    = config.pxPerUnit * Math.pow(2,map.getZoom()),
+              max    = 500;
+        let lines="", labels="";
+        for (let m=0; m<=max; m+=50) {
+          const x = Math.round(m * pxU);
+          if (x <= meterW) {
+            const len = (m % 100 === 0 ? 4 : 2);
+            lines  += `<line x1="${x}" y1="0" x2="${x}" y2="${len}" stroke="#fff" stroke-width="1"/>`;
+            if (m % 100 === 0) {
+              labels += `<text x="${x}" y="12" font-size="10" fill="#fff" text-anchor="middle">${m}</text>`;
+            }
+          }
+        }
+        div.innerHTML = `<svg width="${meterW}" height="16">${lines}${labels}</svg>`;
+        return div;
+      };
+      scaleCtl.addTo(map);
+    }
   </script>
 </body>
 </html>
