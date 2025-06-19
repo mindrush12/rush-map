@@ -2,7 +2,6 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Rush Fantasy Map</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
@@ -12,12 +11,6 @@
       touch-action: none;
       user-select: none;
       -webkit-touch-callout: none;
-    }
-    .leaflet-container, .leaflet-container * {
-      user-select: none !important;
-      -webkit-user-select: none !important;
-      -ms-user-select: none !important;
-      -webkit-tap-highlight-color: transparent !important;
     }
     /* Top bar */
     #bar {
@@ -103,30 +96,6 @@
       padding:4px 8px; font:12px sans-serif;
       border-radius:6px; z-index:1500;
     }
-
-    /* TOUCH DEVICES: scale up UI ~2×, icons ~0.67× */
-    @media (pointer: coarse) {
-      #bar {
-        transform: scale(2);
-        transform-origin: top center;
-      }
-      .leaflet-control-cal,
-      .leaflet-control-measure,
-      .leaflet-control-myscale {
-        transform: scale(2);
-        transform-origin: bottom left;
-      }
-      .pinAsk {
-        transform: scale(2);
-        transform-origin: top left;
-      }
-      /* **only icons** get smaller relative to UI: */
-      .leaflet-marker-icon,
-      .leaflet-marker-shadow {
-        transform: scale(0.67) !important;
-        transform-origin: bottom center !important;
-      }
-    }
   </style>
 </head>
 <body>
@@ -193,7 +162,9 @@
         <button id="a">OK</button>`;
       document.body.appendChild(div);
 
-      const r = div.getBoundingClientRect(), vw = innerWidth, vh = innerHeight;
+      // clamp into view
+      const r = div.getBoundingClientRect(),
+            vw = innerWidth, vh = innerHeight;
       if (left < 4) left = 4;
       if (left + r.width > vw - 4) left = vw - r.width - 4;
       if (top  < 4) top  = 4;
@@ -264,17 +235,26 @@
           L.point(t.clientX - r.left, t.clientY - r.top)
         );
       }
+
       function onPointerDown(e) {
+        // only on bare map background
         if (e.target !== container) return;
+        // ignore pinch/multi
         if (e.pointerType==="touch" && !e.isPrimary) return;
+        // start 750 ms timer
         const pt = toLatLng(e);
-        holdTimer = setTimeout(() => { pinPrompt(pt); }, 750);
+        holdTimer = setTimeout(() => {
+          pinPrompt(pt);
+        }, 750);
+        // capture pointer so moves/up still fire here
         container.setPointerCapture(e.pointerId);
       }
+
       function cancelHold(e) {
         clearTimeout(holdTimer);
         try { container.releasePointerCapture(e.pointerId); } catch {}
       }
+
       container.addEventListener("pointerdown",  onPointerDown);
       container.addEventListener("pointermove",  cancelHold);
       container.addEventListener("pointerup",    cancelHold);
@@ -290,12 +270,13 @@
           <button class="delBtn" style="background:#c00;color:#fff;border:0;border-radius:4px;padding:2px 6px">✕</button>
         </div>`;
       const m = L.marker([p.x,p.y],{icon:icons[p.color]})
-                  .addTo(map).bindPopup(html);
+                    .addTo(map).bindPopup(html);
       markers[id] = m;
       m.on("popupopen", ()=>{
         const c = m.getPopup().getElement();
         c.querySelector(".delBtn").onclick = ()=>{
-          remove(ref(db,"pins/"+id)); map.removeLayer(m);
+          remove(ref(db,"pins/"+id));
+          map.removeLayer(m);
         };
         c.querySelector(".editBtn").onclick = ()=>{
           box.innerHTML = `
